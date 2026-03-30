@@ -1,18 +1,16 @@
 import sys
 import os
 import site
+import time
+import cv2
+import numpy as np
 
-# Ensure MediaPipe and local modules are in path
+# Ensure MediaPipe and local modules are in path (MediaPipe kept for backward compat if needed)
 sys.path.append(os.getcwd())
 sys.path.extend(site.getsitepackages())
 
 import streamlit as st
-import cv2
-import numpy as np
-import time
-import os
 from src.models.yolo_handler import YoloHandler
-from src.models.mp_handler import MediaPipeHandler
 from src.utils.fall_logic import FallDetector
 
 def main():
@@ -25,11 +23,12 @@ def main():
     st.sidebar.header("System Settings")
     input_source = st.sidebar.radio("Input Source", ["Webcam", "Upload Image/Video"])
     
-    pipeline_mode = st.sidebar.selectbox("Inference Pipeline", ["Dual Pipeline", "YOLOv26 Only", "MediaPipe Only"])
+    # Unified Pipeline: MediaPipe is replaced by YOLOv11-Pose
+    st.sidebar.success("Engine: YOLOv11-Pose (Active)")
     
     uploaded_file = None
     if input_source == "Upload Image/Video":
-        uploaded_file = st.sidebar.file_uploader("Choose a file", type=['jpg', 'jpeg', 'png', 'mp4', 'avi'])
+        uploaded_file = st.sidebar.file_uploader("Choose a file", type=['jpg', 'jpeg', 'png', 'mp4', 'avi', 'mov', 'mkv'])
     
     display_skeleton = st.sidebar.checkbox("Show Skeleton Overlay", value=True)
     display_bbox = st.sidebar.checkbox("Show Bounding Box", value=True)
@@ -65,9 +64,8 @@ def main():
         st.markdown("**System Audit Report**")
         audit_box = st.empty()
         
-    # Initialize Core Engine
-    yolo = YoloHandler(model_path='yolo11s.pt', conf=0.2)
-    mp_pose = MediaPipeHandler(model_complexity=2)
+    # Initialize Core Engine (Unified YOLO-Pose)
+    yolo = YoloHandler(model_path='yolo11s-pose.pt', conf=0.2)
     detector = FallDetector()
     
     # Start Video Stream (Simulated or Webcam)
@@ -84,7 +82,7 @@ def main():
         if ext in ['.mp4', '.avi', '.mov', '.mkv']:
             cap = cv2.VideoCapture(tfile)
         else:
-            # It's an image: Use static mode for maximum accuracy on a single frame
+            # It's an image
             frame = cv2.imread(tfile)
             if frame is not None:
                 process_frame_logic(frame, yolo, detector, display_bbox, display_skeleton, frame_placeholder, status_box, velocity_metric, angle_metric, latency_metric, probability_metric, audit_box)
@@ -107,33 +105,28 @@ def main():
 def process_frame_logic(frame, yolo, detector, display_bbox, display_skeleton, frame_placeholder, status_box, velocity_metric, angle_metric, latency_metric, probability_metric, audit_box):
     start_ts = time.time()
     
-    # --- Inference Phase (YOLO-Pose Only) ---
+    # --- Inference Phase (Unified YOLO-Pose) ---
     yolo_detections = yolo.process_frame(frame)
     
-    # --- Keypoint Extraction (Replacement for MediaPipe) ---
+    # --- Keypoint Extraction (YOLO-Pose Mapping) ---
     neck, hips = None, None
     if yolo_detections and yolo_detections[0].get('keypoints') is not None:
         kpts = yolo_detections[0]['keypoints']
-        # Map COCO Keypoints to Neck/Hips
-        # 5,6: shoulders | 11,12: hips
-        if kpts[5][2] > 0.4 and kpts[6][2] > 0.4:
-            neck = ((kpts[5][0] + kpts[6][0])/2, (kpts[5][1] + kpts[6][1])/2)
-        if kpts[11][2] > 0.4 and kpts[12][2] > 0.4:
-            hips = ((kpts[11][0] + kpts[12][0])/2, (kpts[11][1] + kpts[12][1])/2)
+        # Map YOLO COCO Keypoints to Logic (5,6: shoulders | 11,12: hips)
+        if len(kpts) >= 13:
+            # Confidence check for shoulders
+            if kpts[5][2] > 0.4 and kpts[6][2] > 0.4:
+                neck = ((kpts[5][0] + kpts[6][0])/2, (kpts[5][1] + kpts[6][1])/2)
+            # Confidence check for hips
+            if kpts[11][2] > 0.4 and kpts[12][2] > 0.4:
+                hips = ((kpts[11][0] + kpts[12][0])/2, (kpts[11][1] + kpts[12][1])/2)
     
     # --- Detection Logic ---
-    is_fall, is_long_lie, debug = False, False, {"vy": 0, "angle": 0}
+    is_fall, is_long_lie, debug = False, False, {"vy": 0, "angle": 0, "probability": 0}
     
-    if yolo_detections or (neck and hips):
-        # 1. Determine Centroid
-        if yolo_detections:
-            centroid_y = yolo_detections[0]['centroid'][1]
-            bbox = yolo_detections[0]['bbox']
-        else:
-            centroid_y = neck[1]
-            bbox = (neck[0]-50, neck[1]-50, 100, 200) 
-            
-        # 2. Trigger Logic Update
+    if yolo_detections:
+        centroid_y = yolo_detections[0]['centroid'][1]
+        bbox = yolo_detections[0]['bbox']
         is_fall, is_long_lie, debug = detector.update(centroid_y, neck, hips, bbox)
     
     # --- Visualization ---
@@ -163,7 +156,7 @@ def process_frame_logic(frame, yolo, detector, display_bbox, display_skeleton, f
     report_text = "\n".join([f"- **{k}**: {v}" for k, v in indicators.items()])
     audit_box.markdown(report_text)
     
-    # Store formal report in session state for downloading
+    # Store formal report in session state
     if is_fall or is_long_lie:
         status_str = "FALL DETECTED" if is_fall else "CRITICAL LONG LIE"
         st.session_state['report'] = f"""
