@@ -1,1 +1,1 @@
-libgl1
+# No system-level packages needed with opencv-python-headless
