@@ -1,0 +1,23 @@
+MSc_Dissertation_Project/
+├───data/                       # URFD and MCFD Datasets
+│   ├───raw/                    # Unprocessed videos/frames
+│   └───processed/              # Pickled features or normalized data
+├───docs/                       # Dissertation Chapters & Architecture
+│   ├───Chapters/               # .md files for each chapter
+│   └───figures/                # Architecture diagrams, flowcharts, result graphs
+├───notebooks/                  # Exploratory Data Analysis (EDA)
+├───src/                        # Core Source Code
+│   ├───models/                 # Model wrappers (YOLO, MediaPipe)
+│   │   ├───yolo_handler.py     # Pipeline A
+│   │   └───mp_handler.py       # Pipeline B
+│   ├───utils/                  # Helper functions
+│   │   ├───fall_logic.py       # Mathematical heuristic model
+│   │   ├───visualization.py    # OpenCV overlay utilities
+│   │   └───data_loader.py      # Dataset processing
+│   ├───eval/                   # Evaluation & Benchmarking
+│   │   ├───benchmarker.py      # FPS, Latency, Accuracy scripts
+│   │   └───stress_test.py      # Low light, occlusion simulations
+│   └───main.py                 # Central execution script
+├───app.py                      # Streamlit Demo Application
+├───requirements.txt            # Dependency list
+└───README.md                   # Project documentation
