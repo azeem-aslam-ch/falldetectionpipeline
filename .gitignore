@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS generated files
+.DS_Store
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Project specific
+temp_input.*
+dataset/
+demo_result_verified.png
+
+# Large Models (Only keep the one used by app.py)
+yolo11n.pt
+yolo11s.pt
+# yolo11s-pose.pt # NOT ignored, keep for deployment
